@@ -38,6 +38,73 @@ function addMonths(dateString: string, months: number): string {
   ].join("-");
 }
 
+export async function GET() {
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const db = await getDb();
+
+    const purchases = await db
+      .collection("obligations")
+      .find({
+        userId: user.id,
+        obligationType: "installment",
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    const purchaseIds = purchases.map((purchase) =>
+      purchase._id.toString()
+    );
+
+    const payments = purchaseIds.length
+      ? await db
+          .collection("obligationPayments")
+          .find({
+            userId: user.id,
+            obligationId: { $in: purchaseIds },
+          })
+          .sort({ number: 1 })
+          .toArray()
+      : [];
+
+    return NextResponse.json({
+      purchases: purchases.map((purchase) => ({
+        id: purchase._id.toString(),
+        name: purchase.name,
+        accountId: purchase.accountId,
+        totalAmountMillimes: purchase.totalAmountMillimes,
+        installmentCount: purchase.installmentCount,
+        active: purchase.active,
+        createdAt: purchase.createdAt,
+      })),
+      payments: payments.map((payment) => ({
+        id: payment._id.toString(),
+        obligationId: payment.obligationId,
+        number: payment.number,
+        amountMillimes: payment.amountMillimes,
+        dueDate: payment.dueDate,
+        status: payment.status,
+        paidAt: payment.paidAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Loading installment purchases failed:", error);
+
+    return NextResponse.json(
+      { error: "Could not load installment purchases." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
 
@@ -72,6 +139,7 @@ export async function POST(request: Request) {
     totalAmountMillimes,
     installmentCount,
     firstDueDate,
+    payments: customPayments,
   } = body as Record<string, unknown>;
 
   if (
@@ -111,23 +179,84 @@ export async function POST(request: Request) {
       );
     }
 
-    // Split the total into integer millimes without losing any amount.
-    const baseAmount = Math.floor(
-      totalAmountMillimes / installmentCount
-    );
-    const remainder = totalAmountMillimes % installmentCount;
+    
+    type PaymentInput = {
+      amountMillimes: number;
+      dueDate: string;
+    };
 
-    const payments = Array.from(
-      { length: installmentCount },
-      (_, index) => ({
+    let paymentSchedule: Array<{
+      number: number;
+      amountMillimes: number;
+      dueDate: string;
+      status: string;
+      paidAt: null;
+      transactionId: null;
+    }>;
+
+    if (Array.isArray(customPayments)) {
+      if (
+        customPayments.length !== installmentCount ||
+        !customPayments.every(
+          (item): item is PaymentInput =>
+            typeof item === "object" &&
+            item !== null &&
+            typeof item.amountMillimes === "number" &&
+            Number.isSafeInteger(item.amountMillimes) &&
+            item.amountMillimes > 0 &&
+            typeof item.dueDate === "string" &&
+            isValidDate(item.dueDate)
+        )
+      ) {
+        return NextResponse.json(
+          { error: "Enter a valid amount and due date for every installment." },
+          { status: 400 }
+        );
+      }
+
+      const customTotal = customPayments.reduce(
+        (sum, payment) => sum + payment.amountMillimes,
+        0
+      );
+
+      if (
+        !Number.isSafeInteger(customTotal) ||
+        customTotal !== totalAmountMillimes
+      ) {
+        return NextResponse.json(
+          { error: "The installment amounts must add up to the total purchase price." },
+          { status: 400 }
+        );
+      }
+
+      paymentSchedule = customPayments.map((payment, index) => ({
         number: index + 1,
-        amountMillimes: baseAmount + (index < remainder ? 1 : 0),
-        dueDate: addMonths(firstDueDate, index),
+        amountMillimes: payment.amountMillimes,
+        dueDate: payment.dueDate,
         status: "unpaid",
         paidAt: null,
         transactionId: null,
-      })
-    );
+      }));
+    } else {
+      // Backward-compatible equal split for older clients.
+      const baseAmount = Math.floor(
+        totalAmountMillimes / installmentCount
+      );
+      const remainder = totalAmountMillimes % installmentCount;
+
+      paymentSchedule = Array.from(
+        { length: installmentCount },
+        (_, index) => ({
+          number: index + 1,
+          amountMillimes: baseAmount + (index < remainder ? 1 : 0),
+          dueDate: addMonths(firstDueDate, index),
+          status: "unpaid",
+          paidAt: null,
+          transactionId: null,
+        })
+      );
+    }
+
 
     const obligations = db.collection("obligations");
     const obligationPayments = db.collection("obligationPayments");
@@ -136,7 +265,7 @@ export async function POST(request: Request) {
       userId: user.id,
       name: name.trim(),
       obligationType: "installment",
-      amountMillimes: payments[0].amountMillimes,
+      amountMillimes: paymentSchedule[0].amountMillimes,
       totalAmountMillimes,
       installmentCount,
       accountId,
@@ -150,7 +279,7 @@ export async function POST(request: Request) {
 
     try {
       await obligationPayments.insertMany(
-        payments.map((payment) => ({
+        paymentSchedule.map((payment) => ({
           userId: user.id,
           obligationId,
           ...payment,
@@ -177,7 +306,7 @@ export async function POST(request: Request) {
       {
         ok: true,
         id: obligationId,
-        paymentsCreated: payments.length,
+        paymentsCreated: paymentSchedule.length,
       },
       { status: 201 }
     );

@@ -8,6 +8,7 @@ import AddAccountForm from "@/components/AddAccountForm";
 import AddTransactionForm from "@/components/AddTransactionForm";
 import TransactionHistory from "@/components/TransactionHistory";
 import type { HistoryTransaction } from "@/components/TransactionHistory";
+import Link from "next/link";
 
 type Account = {
   id: string;
@@ -37,6 +38,32 @@ type Obligation = {
   next_due_date: string;
 };
 
+
+type InstallmentPurchase = {
+  id: string;
+  name: string;
+};
+
+type InstallmentPayment = {
+  id: string;
+  obligationId: string;
+  number: number;
+  amountMillimes: number;
+  dueDate: string;
+  status: "unpaid" | "processing" | "paid";
+};
+
+type FutureTransaction = {
+  id: string;
+  account_id: string;
+  transaction_type: "income" | "expense";
+  amount_millimes: number;
+  category: string;
+  description: string;
+  transaction_date: string;
+};
+
+
 const money = (millimes: number) =>
   new Intl.NumberFormat("fr-TN", {
     style: "currency",
@@ -58,6 +85,15 @@ export default function Home() {
   useState<Transaction | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
+  const [installmentPurchases, setInstallmentPurchases] =
+  useState<InstallmentPurchase[]>([]);
+
+  const [installmentPayments, setInstallmentPayments] =
+    useState<InstallmentPayment[]>([]);
+
+  const [futureTransactions, setFutureTransactions] =
+  useState<FutureTransaction[]>([]);
+
   const loadDashboard = useCallback(async () => {
     try {
       const response = await fetch("/api/dashboard", { cache: "no-store" });
@@ -71,6 +107,7 @@ export default function Home() {
          accounts?: Account[];
         balances?: Account[];
         transactions?: Transaction[];
+        futureTransactions?: FutureTransaction[];
         obligations?: Obligation[];
         error?: string;
       };
@@ -81,6 +118,7 @@ export default function Home() {
 
       setAccounts(result.balances ?? []);
       setTransactions(result.transactions ?? []);
+      setFutureTransactions(result.futureTransactions ?? []);
       setObligations(result.obligations ?? []);
     } catch (err) {
       setError(
@@ -95,6 +133,38 @@ export default function Home() {
   useEffect(() => {
     void Promise.resolve().then(loadDashboard);
   }, [loadDashboard]);
+  
+  useEffect(() => {
+    async function loadInstallments() {
+      try {
+        const response = await fetch("/api/obligations", {
+          cache: "no-store",
+        });
+
+        if (response.status === 401) {
+          router.replace("/login");
+          return;
+        }
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error ?? "Could not load payment schedule.");
+        }
+
+        setInstallmentPurchases(result.purchases ?? []);
+        setInstallmentPayments(result.payments ?? []);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not load installment payments."
+        );
+      }
+    }
+
+    void loadInstallments();
+  }, [router]);
 
   async function signOut() {
     try {
@@ -202,6 +272,95 @@ const upcoming = obligations.filter(
   );
 
   const safeToSpend = totalBalance - reservedPayments;
+  
+  const purchaseNames = new Map(
+    installmentPurchases.map((purchase) => [purchase.id, purchase.name])
+  );
+
+  // Keep non-installment obligations from the existing dashboard.
+  // Installments are taken from their individual payment schedules instead.
+  const scheduledItems = [
+    ...upcoming
+      .filter((item) => item.obligation_type !== "installment")
+      .map((item) => ({
+        date: item.next_due_date < today ? today : item.next_due_date,
+        incomeMillimes: 0,
+        expenseMillimes: item.amount_millimes,
+        label: item.name,
+      })),
+    ...futureTransactions.map((transaction) => ({
+      date: transaction.transaction_date,
+      incomeMillimes:
+        transaction.transaction_type === "income"
+          ? transaction.amount_millimes
+          : 0,
+      expenseMillimes:
+        transaction.transaction_type === "expense"
+          ? transaction.amount_millimes
+          : 0,
+      label:
+        `${transaction.transaction_type === "income" ? "Planned income" : "Planned expense"} — ${transaction.description || transaction.category}`,
+    })),
+
+    ...installmentPayments
+      .filter(
+        (payment) =>
+          payment.status === "unpaid" ||
+          payment.status === "processing"
+      )
+      .map((payment) => ({
+        date: payment.dueDate < today ? today : payment.dueDate,
+        incomeMillimes: 0,
+        expenseMillimes: payment.amountMillimes,
+        label: `${purchaseNames.get(payment.obligationId) ?? "Installment purchase"} — payment ${payment.number}`,
+      })),
+  ];
+
+  
+  const paymentsByDate = new Map<
+    string,
+    {
+      date: string;
+      incomeMillimes: number;
+      expenseMillimes: number;
+      labels: string[];
+    }
+  >();
+
+  for (const item of scheduledItems) {
+    const existing = paymentsByDate.get(item.date);
+
+    if (existing) {
+      existing.incomeMillimes += item.incomeMillimes;
+      existing.expenseMillimes += item.expenseMillimes;
+      existing.labels.push(item.label);
+    } else {
+      paymentsByDate.set(item.date, {
+        date: item.date,
+        incomeMillimes: item.incomeMillimes,
+        expenseMillimes: item.expenseMillimes,
+        labels: [item.label],
+      });
+    }
+  }
+
+  let projectedBalance = totalBalance;
+
+  const futureProjection = [...paymentsByDate.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((item) => {
+      projectedBalance +=
+        item.incomeMillimes - item.expenseMillimes;
+
+      return { ...item, projectedBalance };
+    });
+
+
+  function formatDueDate(dateString: string) {
+    const [year, month, day] = dateString.split("-");
+    return `${day}/${month}/${year}`;
+  }
+
 
   if (loading) {
     return (
@@ -224,13 +383,31 @@ const upcoming = obligations.filter(
               Your money, clearly organized.
             </p>
           </div>
-          <button
-            onClick={signOut}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-900"
-          >
-            Sign out
-          </button>
+
+          <nav className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/"
+              className="rounded-lg border border-emerald-700 bg-emerald-950/40 px-4 py-2 text-sm text-emerald-300"
+            >
+              Dashboard
+            </Link>
+
+            <Link
+              href="/installments"
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-900"
+            >
+              Installments
+            </Link>
+
+            <button
+              onClick={signOut}
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-900"
+            >
+              Sign out
+            </button>
+          </nav>
         </header>
+
 
         {error && (
           <div role="alert" className="rounded-xl border border-red-800 p-4 text-red-300">
@@ -415,29 +592,72 @@ const upcoming = obligations.filter(
             void handleDeleteTransaction(id);
           }}
         />
-
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <h2 className="text-lg font-semibold">Payment schedule</h2>
-          <div className="mt-4 space-y-3">
-            {upcoming.length === 0 ? (
+          <h2 className="text-lg font-semibold">
+            Future payments & projected balance
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-400">
+            Estimated combined balance after scheduled payments, assuming no
+            additional income, spending, or transfers.
+          </p>
+
+          <div className="mt-5 space-y-4">
+            {futureProjection.length === 0 ? (
               <p className="text-sm text-slate-400">
-                No upcoming payments. Add your installments and bills in the
-                next step.
+                No upcoming unpaid payments. Your current combined balance is{" "}
+                <span className="font-semibold text-white">
+                  {money(totalBalance)}
+                </span>.
               </p>
             ) : (
-              upcoming.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3"
+              futureProjection.map((item) => (
+                <article
+                  key={item.date}
+                  className="rounded-xl border border-slate-800 p-4"
                 >
-                  <div>
-                    <p>{item.name}</p>
-                    <p className="text-sm text-slate-400">
-                      {item.obligation_type} · Due {item.next_due_date}
-                    </p>
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold">
+                        On {formatDueDate(item.date)}
+                      </p>
+
+                      <p className="mt-1 text-sm text-slate-400">
+                        {item.labels.join(", ")}
+                      </p>
+
+                      <div>
+                        <p className="text-sm text-slate-400">Planned income</p>
+                        <p className="font-medium text-emerald-400">
+                          +{money(item.incomeMillimes)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-sm text-slate-400">Planned expenses</p>
+                        <p className="font-medium text-rose-400">
+                          -{money(item.expenseMillimes)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-xs text-slate-400">
+                        Projected balance
+                      </p>
+
+                      <p
+                        className={`mt-1 text-xl font-bold ${
+                          item.projectedBalance < 0
+                            ? "text-rose-400"
+                            : "text-emerald-400"
+                        }`}
+                      >
+                        {money(item.projectedBalance)}
+                      </p>
+                    </div>
                   </div>
-                  <p className="font-semibold">{money(item.amount_millimes)}</p>
-                </div>
+                </article>
               ))
             )}
           </div>

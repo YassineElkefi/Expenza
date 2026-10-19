@@ -59,6 +59,14 @@ function getTunisianDateParts(date: Date) {
   };
 }
 
+function getTunisTodayString() {
+  const { year, month, day } = getTunisianDateParts(new Date());
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(
+    day,
+  ).padStart(2, "0")}`;
+}
+
 function getCurrentMonthRange() {
   const { year, month } = getTunisianDateParts(new Date());
 
@@ -86,6 +94,7 @@ export async function GET() {
     const db = await getDb();
     const userId = user.id;
     const { start, end } = getCurrentMonthRange();
+    const today = getTunisTodayString();
 
     const accountsCollection = db.collection<AccountDocument>("accounts");
     const transactionsCollection =
@@ -93,7 +102,7 @@ export async function GET() {
     const obligationsCollection =
       db.collection<ObligationDocument>("obligations");
 
-    const [accounts, recentTransactions, obligations, allBalances, monthlyTotals] =
+    const [accounts, recentTransactions, futureTransactions, obligations, allBalances, monthlyTotals] =
       await Promise.all([
         accountsCollection
           .find({ userId })
@@ -101,9 +110,14 @@ export async function GET() {
           .toArray(),
 
         transactionsCollection
-          .find({ userId })
+          .find({ userId, transactionDate: { $lte: today } })
           .sort({ transactionDate: -1, _id: -1 })
           .limit(10)
+          .toArray(),
+
+        transactionsCollection
+          .find({ userId, transactionDate: { $gt: today } })
+          .sort({ transactionDate: 1, _id: 1 })
           .toArray(),
 
         obligationsCollection
@@ -117,7 +131,12 @@ export async function GET() {
             income: number;
             expense: number;
           }>([
-            { $match: { userId } },
+            {
+              $match: {
+                userId,
+                transactionDate: { $lte: today },
+              },
+            },
             {
               $group: {
                 _id: "$accountId",
@@ -152,7 +171,11 @@ export async function GET() {
             {
               $match: {
                 userId,
-                transactionDate: { $gte: start, $lt: end },
+                transactionDate: {
+                  $gte: start,
+                  $lt: end,
+                  $lte: today,
+                },
               },
             },
             {
@@ -222,6 +245,16 @@ export async function GET() {
         description: transaction.description ?? "",
         transaction_date: toDateString(transaction.transactionDate),
       })),
+
+      futureTransactions: futureTransactions.map((transaction) => ({
+      id: transaction._id.toString(),
+      account_id: transaction.accountId,
+      transaction_type: transaction.transactionType,
+      amount_millimes: transaction.amountMillimes,
+      category: transaction.category,
+      description: transaction.description ?? "",
+      transaction_date: toDateString(transaction.transactionDate),
+    })),
 
       obligations: obligations.map((obligation) => ({
         id: obligation._id.toString(),
