@@ -382,6 +382,25 @@ export default function DashboardPage() {
     return { value, label };
   });
 
+  const futureExpenses = futureTransactions
+  .filter((t) => t.transaction_type === "expense")
+  .reduce((s, t) => s + t.amount_millimes, 0);
+
+  const futureIncome = futureTransactions
+    .filter((t) => t.transaction_type === "income")
+    .reduce((s, t) => s + t.amount_millimes, 0);
+
+  const RESERVE_BUFFER = 1_000_000; // 1000 TND in millimes
+
+  const safeToSpend = Math.max(
+    0,
+    totalBalance
+      - totalInstallmentsRemaining
+      - futureExpenses
+      + futureIncome
+      - RESERVE_BUFFER
+  );
+
   return (
     <div className="space-y-8">
 
@@ -463,6 +482,12 @@ export default function DashboardPage() {
           value={fmt(totalInstallmentsRemaining)}
           sub={`${installmentPayments.filter((p) => p.status === "unpaid").length} payments left`}
           accent="amber"
+        />
+        <StatCard
+          label="Safe to spend"
+          value={fmt(safeToSpend)}
+          sub={`${fmt(RESERVE_BUFFER)} buffer reserved`}
+          accent={safeToSpend > 1_000_000 ? "green" : safeToSpend > 500_000 ? "amber" : "red"}
         />
       </div>
       
