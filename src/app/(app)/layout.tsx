@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { Alert } from "@/components/ui/Alert";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const nav = [
@@ -117,9 +118,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* <ThemeToggle /> */}
           <div className="divider mb-3" />
           {signOutError && (
-            <p role="alert" className="mb-2 text-xs" style={{ color: "var(--danger)" }}>
+            <Alert type="error" className="alert-compact mb-2">
               {signOutError}
-            </p>
+            </Alert>
           )}
           <button
             type="button"
@@ -168,9 +169,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </button>
           </nav>
           {signOutError && (
-            <p role="alert" className="px-4 pb-2 text-xs" style={{ color: "var(--danger)" }}>
+            <Alert type="error" className="alert-compact mx-4 mb-2">
               {signOutError}
-            </p>
+            </Alert>
           )}
         </header>
 

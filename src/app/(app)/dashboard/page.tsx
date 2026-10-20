@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Alert } from "@/components/ui/Alert";
 import {
   BarChart,
   Bar,
@@ -422,7 +423,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && <Alert type="error">{error}</Alert>}
 
       {/* ── Hero balance + top stats ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

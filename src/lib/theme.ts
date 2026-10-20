@@ -26,8 +26,4 @@ export const ui = {
   badgeAmber: "badge badge-amber",
   badgeSlate: "badge badge-neutral",
 
-  // Alerts
-  alertError: "alert alert-error",
-  alertSuccess: "alert alert-success",
-  alertWarning: "alert alert-warning",
 };

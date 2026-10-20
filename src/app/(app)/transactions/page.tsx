@@ -7,6 +7,7 @@ import TransactionHistory, {
   type HistoryTransaction,
 } from "@/components/TransactionHistory";
 import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import TransferForm from "@/components/TransferForm";
 
 type Account = {
@@ -23,6 +24,9 @@ export default function TransactionsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [editingTransaction, setEditingTransaction] =
     useState<HistoryTransaction | null>(null);
+  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(
+    null,
+  );
   const [formMode, setFormMode] = useState<"transaction" | "transfer">("transaction");
 
 
@@ -68,14 +72,6 @@ export default function TransactionsPage() {
   }
 
   async function deleteTransaction(id: string) {
-    if (
-      !window.confirm(
-        "Delete this transaction permanently? Your account balances will be recalculated.",
-      )
-    ) {
-      return;
-    }
-
     setError("");
 
     try {
@@ -189,7 +185,19 @@ export default function TransactionsPage() {
           setEditingTransaction(transaction);
           window.scrollTo({ top: 0, behavior: "smooth" });
         }}
-        onDelete={(id) => void deleteTransaction(id)}
+        onDelete={setTransactionToDelete}
+      />
+      <ConfirmDialog
+        open={transactionToDelete !== null}
+        title="Delete this transaction?"
+        description="This permanently deletes the transaction and recalculates your account balances."
+        confirmLabel="Delete transaction"
+        onCancel={() => setTransactionToDelete(null)}
+        onConfirm={() => {
+          const id = transactionToDelete;
+          setTransactionToDelete(null);
+          if (id) void deleteTransaction(id);
+        }}
       />
     </div>
   );

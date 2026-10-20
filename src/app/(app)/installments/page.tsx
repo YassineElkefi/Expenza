@@ -4,6 +4,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type Account = {
   id: string;
@@ -41,6 +43,11 @@ type EditPaymentRow = {
   dueDate: string;
   status: Payment["status"];
 };
+
+type PendingConfirmation =
+  | { kind: "delete"; purchase: Purchase }
+  | { kind: "pay"; purchase: Purchase; payment: Payment }
+  | null;
 
 const money = (millimes: number) =>
   new Intl.NumberFormat("fr-TN", {
@@ -82,6 +89,8 @@ export default function InstallmentsPage() {
   const [deletingId, setDeletingId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [pendingConfirmation, setPendingConfirmation] =
+    useState<PendingConfirmation>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -364,7 +373,7 @@ export default function InstallmentsPage() {
     }
   }
 
-  async function deletePurchase(purchase: Purchase) {
+  function requestDeletePurchase(purchase: Purchase) {
     const purchasePayments = payments.filter(
       (payment) => payment.obligationId === purchase.id
     );
@@ -386,12 +395,10 @@ export default function InstallmentsPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete "${purchase.name}" and its ${purchasePayments.length} scheduled installments? This cannot be undone.`
-    );
+    setPendingConfirmation({ kind: "delete", purchase });
+  }
 
-    if (!confirmed) return;
-
+  async function deletePurchase(purchase: Purchase) {
     setDeletingId(purchase.id);
     setError("");
     setNotice("");
@@ -423,12 +430,6 @@ export default function InstallmentsPage() {
   }
 
   async function markPaid(purchase: Purchase, payment: Payment) {
-    const confirmed = window.confirm(
-      `Mark installment ${payment.number} of "${purchase.name}" as paid for ${money(payment.amountMillimes)}? This will record an expense in your account.`
-    );
-
-    if (!confirmed) return;
-
     setPayingId(payment.id);
     setError("");
     setNotice("");
@@ -520,23 +521,9 @@ export default function InstallmentsPage() {
           </button>
         </header>
 
-        {error && (
-          <div
-            role="alert"
-            className="rounded-xl border border-danger bg-danger-subtle p-4 text-sm text-danger"
-          >
-            {error}
-          </div>
-        )}
+        {error && <Alert type="error">{error}</Alert>}
 
-        {notice && (
-          <div
-            role="status"
-            className="rounded-xl border border-accent bg-success-subtle p-4 text-sm text-success"
-          >
-            {notice}
-          </div>
-        )}
+        {notice && <Alert type="success">{notice}</Alert>}
 
         <section className="grid gap-4 sm:grid-cols-3">
           <article className="rounded-2xl border border-theme bg-surface p-5">
@@ -571,9 +558,9 @@ export default function InstallmentsPage() {
           </p>
 
           {accounts.length === 0 ? (
-            <p className="mt-5 rounded-lg border border-warning p-4 text-sm text-warning">
+            <Alert type="warning" className="mt-5">
               Create an account on your dashboard before adding a purchase.
-            </p>
+            </Alert>
           ) : (
             <form onSubmit={createPurchase} className="mt-6 space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -846,7 +833,7 @@ export default function InstallmentsPage() {
                         <button
                           type="button"
                           disabled={!!deletingId || hasPaid || hasProcessing}
-                          onClick={() => void deletePurchase(purchase)}
+                          onClick={() => requestDeletePurchase(purchase)}
                           className="rounded-lg border border-danger px-4 py-2 text-sm text-danger hover:bg-danger-subtle disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {deletingId === purchase.id
@@ -1015,7 +1002,11 @@ export default function InstallmentsPage() {
                                     type="button"
                                     disabled={!!payingId || editing}
                                     onClick={() =>
-                                      void markPaid(purchase, payment)
+                                      setPendingConfirmation({
+                                        kind: "pay",
+                                        purchase,
+                                        payment,
+                                      })
                                     }
                                     className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-on-accent hover:bg-accent-hover disabled:opacity-50"
                                   >
@@ -1046,6 +1037,38 @@ export default function InstallmentsPage() {
           </Link>
         </footer>
       </div>
+      <ConfirmDialog
+        open={pendingConfirmation !== null}
+        title={
+          pendingConfirmation?.kind === "delete"
+            ? "Delete this purchase?"
+            : "Mark installment as paid?"
+        }
+        description={
+          pendingConfirmation?.kind === "delete"
+            ? `Delete "${pendingConfirmation.purchase.name}" and its ${payments.filter((payment) => payment.obligationId === pendingConfirmation.purchase.id).length} scheduled installments? This cannot be undone.`
+            : pendingConfirmation
+              ? `Mark installment ${pendingConfirmation.payment.number} of "${pendingConfirmation.purchase.name}" as paid for ${money(pendingConfirmation.payment.amountMillimes)}? This will record an expense in your account.`
+              : ""
+        }
+        confirmLabel={
+          pendingConfirmation?.kind === "delete"
+            ? "Delete purchase"
+            : "Mark as paid"
+        }
+        onCancel={() => setPendingConfirmation(null)}
+        onConfirm={() => {
+          const confirmation = pendingConfirmation;
+          setPendingConfirmation(null);
+          if (!confirmation) return;
+
+          if (confirmation.kind === "delete") {
+            void deletePurchase(confirmation.purchase);
+          } else {
+            void markPaid(confirmation.purchase, confirmation.payment);
+          }
+        }}
+      />
     </div>
   );
 }

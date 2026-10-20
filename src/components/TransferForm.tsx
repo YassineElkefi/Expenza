@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Alert } from "@/components/ui/Alert";
 
 type Account = { id: string; name: string };
 
@@ -127,7 +128,7 @@ export default function TransferForm({ accounts, onTransferred }: Props) {
         />
       </label>
 
-      {error && <p className="text-sm" style={{ color: "var(--danger)" }}>{error}</p>}
+      {error && <Alert type="error">{error}</Alert>}
 
       <button type="submit" disabled={loading} className="btn btn-primary w-full">
         {loading ? "Transferring..." : "Transfer"}

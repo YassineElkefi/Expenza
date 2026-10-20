@@ -269,28 +269,95 @@
   /* ── Alerts / Feedback ────────────────────── */
 
   .alert {
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--alert-border);
+    border-radius: 0.625rem;
+    background-color: var(--alert-bg);
+    color: var(--alert-fg);
     font-size: 0.875rem;
-    border: 1px solid;
+    line-height: 1.5;
+  }
+
+  .alert-icon {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.125rem;
+    color: var(--alert-icon);
+  }
+
+  .alert-content {
+    min-width: 0;
+  }
+
+  .alert-compact {
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  .alert-compact .alert-icon {
+    width: 1rem;
+    height: 1rem;
   }
 
   .alert-error {
-    background-color: var(--danger-subtle);
-    border-color: color-mix(in srgb, var(--danger) 30%, transparent);
-    color: var(--danger);
+    --alert-bg: #fef2f2;
+    --alert-border: #fecaca;
+    --alert-fg: #991b1b;
+    --alert-icon: #dc2626;
+  }
+
+  .dark .alert-error {
+    --alert-bg: #2b1718;
+    --alert-border: #713437;
+    --alert-fg: #fecaca;
+    --alert-icon: #f87171;
   }
 
   .alert-success {
-    background-color: var(--success-subtle);
-    border-color: color-mix(in srgb, var(--success) 30%, transparent);
-    color: var(--success);
+    --alert-bg: #f0fdf4;
+    --alert-border: #bbf7d0;
+    --alert-fg: #166534;
+    --alert-icon: #16a34a;
+  }
+
+  .dark .alert-success {
+    --alert-bg: #14251b;
+    --alert-border: #28583a;
+    --alert-fg: #bbf7d0;
+    --alert-icon: #4ade80;
   }
 
   .alert-warning {
-    background-color: var(--warning-subtle);
-    border-color: color-mix(in srgb, var(--warning) 30%, transparent);
-    color: var(--warning);
+    --alert-bg: #fffbeb;
+    --alert-border: #fde68a;
+    --alert-fg: #92400e;
+    --alert-icon: #d97706;
+  }
+
+  .dark .alert-warning {
+    --alert-bg: #292114;
+    --alert-border: #6b4d1d;
+    --alert-fg: #fde68a;
+    --alert-icon: #fbbf24;
+  }
+
+  .alert-info {
+    --alert-bg: #eff6ff;
+    --alert-border: #bfdbfe;
+    --alert-fg: #1e40af;
+    --alert-icon: #2563eb;
+  }
+
+  .dark .alert-info {
+    --alert-bg: #172235;
+    --alert-border: #334f78;
+    --alert-fg: #bfdbfe;
+    --alert-icon: #60a5fa;
   }
 
   /* ── Stat number ──────────────────────────── */

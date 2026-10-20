@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { Alert } from "@/components/ui/Alert";
 import { FormField } from "@/components/ui/FormField";
 import { ui } from "@/lib/theme";
 
@@ -208,8 +209,8 @@ export default function AddTransactionForm({
         placeholder="e.g. Weekly groceries"
       />
 
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      {success && <p role="status" className="text-sm text-green-700">{success}</p>}
+      {error && <Alert type="error">{error}</Alert>}
+      {success && <Alert type="success">{success}</Alert>}
 
       <button
         type="submit"
