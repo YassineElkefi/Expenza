@@ -1,61 +1,75 @@
-import { StatCard } from "@/components/ui/StatCard";
-import { money } from "@/lib/money";
-
 type Props = {
-  totalBalance: number;
+  accounts: { id: string; name: string; balance_millimes: number }[];
   monthlyIncome: number;
   monthlyExpenses: number;
+  lastMonthExpenses: number;
+  netThisMonth: number;
+  totalInstallmentsRemaining: number;
+  unpaidCount: number;
   safeToSpend: number;
-  reservedPayments: number;
-  upcomingCount: number;
+  reserveBuffer: number;
+  fmt: (millimes: number) => string;
 };
 
-export function StatsRow({
-  totalBalance,
-  monthlyIncome,
-  monthlyExpenses,
-  safeToSpend,
-  reservedPayments,
-  upcomingCount,
-}: Props) {
-  return (
-    <section className="space-y-4">
-      {/* Hero stat */}
-      <div className="rounded-2xl border border-emerald-900/60 bg-gradient-to-br from-emerald-950/60 to-slate-900 p-6">
-        <p className="text-sm font-medium text-emerald-400">Total balance</p>
-        <p className="mt-2 text-5xl font-bold tracking-tight">
-          {money(totalBalance)}
-        </p>
-        <p className="mt-1 text-sm text-slate-400">
-          Across all accounts
-        </p>
-      </div>
+function StatCard({
+  label, value, sub, accent,
+}: {
+  label: string; value: string; sub?: string;
+  accent?: "green" | "red" | "amber";
+}) {
+  const valueColor =
+    accent === "green" ? "var(--success)" :
+    accent === "red"   ? "var(--danger)"  :
+    accent === "amber" ? "var(--warning)" :
+    "var(--text-primary)";
 
-      {/* Secondary stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Income this month"
-          value={money(monthlyIncome)}
-          accent="emerald"
-        />
-        <StatCard
-          label="Expenses this month"
-          value={money(monthlyExpenses)}
-          accent="red"
-        />
-        <StatCard
-          label="Safe to spend"
-          value={money(safeToSpend)}
-          accent={safeToSpend < 0 ? "red" : "emerald"}
-          sub="After upcoming reservations"
-        />
-        <StatCard
-          label="Reserved for payments"
-          value={money(reservedPayments)}
-          accent="amber"
-          sub={`${upcomingCount} payment${upcomingCount === 1 ? "" : "s"} due`}
-        />
-      </div>
-    </section>
+  return (
+    <div className="surface p-5">
+      <p className="label">{label}</p>
+      <p className="stat-value mt-3" style={{ color: valueColor }}>{value}</p>
+      {sub && <p className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>{sub}</p>}
+    </div>
+  );
+}
+
+export function StatsRow({
+  monthlyIncome, monthlyExpenses, lastMonthExpenses,
+  netThisMonth, totalInstallmentsRemaining, unpaidCount,
+  safeToSpend, reserveBuffer, fmt,
+}: Props) {
+  const expenseDelta =
+    lastMonthExpenses === 0
+      ? null
+      : ((monthlyExpenses - lastMonthExpenses) / lastMonthExpenses) * 100;
+
+  return (
+    <>
+      <StatCard label="Income this month" value={fmt(monthlyIncome)} accent="green" />
+      <StatCard
+        label="Expenses this month"
+        value={fmt(monthlyExpenses)}
+        sub={expenseDelta !== null
+          ? `${expenseDelta > 0 ? "+" : ""}${expenseDelta.toFixed(0)}% vs last month`
+          : undefined}
+        accent="red"
+      />
+      <StatCard
+        label="Net this month"
+        value={fmt(netThisMonth)}
+        accent={netThisMonth >= 0 ? "green" : "red"}
+      />
+      <StatCard
+        label="Installments remaining"
+        value={fmt(totalInstallmentsRemaining)}
+        sub={`${unpaidCount} payment${unpaidCount !== 1 ? "s" : ""} left`}
+        accent="amber"
+      />
+      <StatCard
+        label="Safe to spend"
+        value={fmt(safeToSpend)}
+        sub={`${fmt(reserveBuffer)} buffer reserved`}
+        accent={safeToSpend > 1_000_000 ? "green" : safeToSpend > 500_000 ? "amber" : "red"}
+      />
+    </>
   );
 }

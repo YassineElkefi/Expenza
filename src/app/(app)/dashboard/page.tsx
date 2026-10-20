@@ -12,6 +12,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { AccountsPanel } from "@/components/dashboard/AccountsPanel";
+import { StatsRow } from "@/components/dashboard/StatsRow";
+import { PlannedTransactions } from "@/components/dashboard/PlannedTransactions";
+import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 
 /* ── types ──────────────────────────────────── */
 
@@ -427,127 +431,26 @@ export default function DashboardPage() {
 
       {/* ── Hero balance + top stats ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Hero — spans 2 on large */}
-        <div
-          className="surface sm:col-span-2 p-6"
-          style={{
-            background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, var(--bg-surface)), var(--bg-surface))",
-          }}
-        >
-          <p className="label">Total balance</p>
-          <p className="stat-value-lg mt-3">{fmt(totalBalance)}</p>
-          <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-            Across {accounts.length} account{accounts.length !== 1 ? "s" : ""}
-          </p>
-
-          {/* Mini account list */}
-          {accounts.length > 0 && (
-            <div className="mt-4 space-y-1.5">
-              {accounts.map((a) => (
-                <div key={a.id} className="flex justify-between text-sm">
-                  <span style={{ color: "var(--text-secondary)" }}>{a.name}</span>
-                  <span
-                    className="font-medium tabular-nums"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {fmt(a.balance_millimes)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <StatCard
-          label="Income this month"
-          value={fmt(monthlyIncome)}
-          accent="green"
-        />
-        <StatCard
-          label="Expenses this month"
-          value={fmt(monthlyExpenses)}
-          sub={
-            expenseDelta !== null
-              ? `${expenseDelta > 0 ? "+" : ""}${expenseDelta.toFixed(0)}% vs last month`
-              : undefined
-          }
-          accent="red"
-        />
-        <StatCard
-          label="Net this month"
-          value={fmt(monthlyIncome - monthlyExpenses)}
-          accent={monthlyIncome >= monthlyExpenses ? "green" : "red"}
-        />
-        <StatCard
-          label="Installments remaining"
-          value={fmt(totalInstallmentsRemaining)}
-          sub={`${installmentPayments.filter((p) => p.status === "unpaid").length} payments left`}
-          accent="amber"
-        />
-        <StatCard
-          label="Safe to spend"
-          value={fmt(safeToSpend)}
-          sub={`${fmt(RESERVE_BUFFER)} buffer reserved`}
-          accent={safeToSpend > 1_000_000 ? "green" : safeToSpend > 500_000 ? "amber" : "red"}
+        <AccountsPanel accounts={accounts} fmt={fmt} />
+        <StatsRow
+          monthlyIncome={monthlyIncome}
+          monthlyExpenses={monthlyExpenses}
+          lastMonthExpenses={lastMonthExpenses}
+          netThisMonth={monthlyIncome - monthlyExpenses}
+          totalInstallmentsRemaining={totalInstallmentsRemaining}
+          unpaidCount={installmentPayments.filter((p) => p.status === "unpaid").length}
+          safeToSpend={safeToSpend}
+          reserveBuffer={RESERVE_BUFFER}
+          fmt={fmt} accounts={[]}        
         />
       </div>
       
       {/* ── Planned transactions ── */}
-      {futureTransactions.length > 0 && (
-        <div className="surface p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <SectionHeader
-              title="Planned transactions"
-              sub={`${futureTransactions.length} upcoming · projected balance: ${fmt(projectedBalance)}`}
-            />
-          </div>
-          <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-            {(() => {
-              const sortedFuture = [...futureTransactions].sort((a, b) =>
-                a.transaction_date.localeCompare(b.transaction_date)
-              );
-              let running = totalBalance;
-              const futureWithRunning = sortedFuture.map((t) => {
-                if (t.transaction_type === "income") running += t.amount_millimes;
-                else if (t.transaction_type === "expense") running -= t.amount_millimes;
-                return { ...t, runningBalance: running };
-              });
-              return futureWithRunning.slice(0, 5).map((t) => {
-                const isIncome = t.transaction_type === "income";
-                return (
-                  <div key={t.id} className="flex items-center gap-3 py-3">
-                    <div
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base"
-                      style={{ background: "var(--bg-subtle)" }}
-                    >
-                      {CATEGORY_ICONS[t.category] ?? "📦"}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                        {t.description || t.category}
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                        {t.category} · {t.transaction_date}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span
-                        className="text-sm font-semibold tabular-nums"
-                        style={{ color: isIncome ? "var(--success)" : "var(--danger)" }}
-                      >
-                        {isIncome ? "+" : "−"}{fmt(t.amount_millimes)}
-                      </span>
-                      <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                        → {fmt(t.runningBalance)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        </div>
-      )}
+      <PlannedTransactions
+        transactions={futureTransactions}
+        totalBalance={totalBalance}
+        fmt={fmt}
+      />
 
       {/* ── Charts ── */}
       <div className="grid gap-6 lg:grid-cols-5">
@@ -659,78 +562,7 @@ export default function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
 
         {/* Recent transactions */}
-        <div className="surface p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <SectionHeader title="Recent transactions" />
-            <a
-              href="/transactions"
-              className="text-xs font-medium"
-              style={{ color: "var(--accent)" }}
-            >
-              View all →
-            </a>
-          </div>
-
-          {recentTx.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              No transactions yet.
-            </p>
-          ) : (
-            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-              {groupedRecentTx.map((t) => {
-                const isIncome = t.transaction_type === "income";
-                const isTransfer = t.transaction_type === "transfer_out" || t.transaction_type === "transfer_in";
-                const icon = isTransfer ? "🔄" : (CATEGORY_ICONS[t.category] ?? "📦");
-                const date = new Date(t.transaction_date);
-                const dateLabel = date.toLocaleDateString("en-TN", { month: "short", day: "numeric" });
-
-                return (
-                  <div key={t.id} className="flex items-center gap-3 py-3">
-                    <div
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base"
-                      style={{ background: "var(--bg-subtle)" }}
-                    >
-                      {icon}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                        {t.description || t.category}
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                        {isTransfer ? "Transfer" : t.category} · {dateLabel}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      {isTransfer ? (
-                        <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--text-muted)" }}>
-                          {fmt(t.amount_millimes)}
-                        </span>
-                      ) : (
-                        <span
-                          className="text-sm font-semibold tabular-nums"
-                          style={{ color: isIncome ? "var(--success)" : "var(--danger)" }}
-                        >
-                          {isIncome ? "+" : "−"}{fmt(t.amount_millimes)}
-                        </span>
-                      )}
-                      <span
-                        className="text-[10px] font-medium rounded-full px-1.5 py-0.5 capitalize"
-                        style={{
-                          background: "color-mix(in srgb, var(--text-muted) 12%, transparent)",
-                          color: isTransfer ? "var(--text-muted)" : isIncome ? "var(--success)" : "var(--danger)",
-                        }}
-                      >
-                        {isTransfer ? "transfer" : t.transaction_type}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <RecentTransactions transactions={transactions} fmt={fmt} />
 
         {/* Upcoming installments */}
         <div className="surface p-5">

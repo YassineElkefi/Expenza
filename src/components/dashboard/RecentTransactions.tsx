@@ -1,9 +1,12 @@
-import { Card } from "@/components/ui/Card";
-import { money } from "@/lib/money";
+const CATEGORY_ICONS: Record<string, string> = {
+  Food: "🍽️", Transport: "🚗", Shopping: "🛍️", "E-Shopping": "🛒",
+  Health: "💊", Housing: "🏠", Entertainment: "🎬", Utilities: "⚡",
+  Salary: "💼", Freelance: "💻", Other: "📦", ATM: "🏧",
+  Transfer: "🔄", Banking: "🏦", Gaming: "🎮",
+};
 
 type Transaction = {
   id: string;
-  account_id: string;
   transaction_type: string;
   amount_millimes: number;
   category: string;
@@ -13,74 +16,112 @@ type Transaction = {
 
 type Props = {
   transactions: Transaction[];
-  onEdit: (transaction: Transaction) => void;
-  onDelete: (id: string) => void;
+  fmt: (millimes: number) => string;
 };
 
-export function RecentTransactions({ transactions, onEdit, onDelete }: Props) {
+function groupTransactions(transactions: Transaction[]) {
+  const sorted = [...transactions].sort((a, b) =>
+    b.transaction_date.localeCompare(a.transaction_date)
+  );
+  const seen = new Set<string>();
+  const result: (Transaction & { paired?: true })[] = [];
+
+  for (const t of sorted) {
+    if (seen.has(t.id)) continue;
+    if (t.transaction_type === "transfer_out") {
+      const pair = sorted.find(
+        (o) =>
+          o.transaction_type === "transfer_in" &&
+          o.transaction_date === t.transaction_date &&
+          o.description === t.description &&
+          !seen.has(o.id)
+      );
+      if (pair) {
+        seen.add(t.id);
+        seen.add(pair.id);
+        result.push({ ...t, paired: true });
+        continue;
+      }
+    }
+    if (t.transaction_type === "transfer_in") { seen.add(t.id); continue; }
+    seen.add(t.id);
+    result.push(t);
+  }
+  return result.slice(0, 5);
+}
+
+export function RecentTransactions({ transactions, fmt }: Props) {
+  const grouped = groupTransactions(transactions);
+
   return (
-    <Card>
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Recent transactions</h2>
-        {transactions.length > 0 && (
-          <span className="text-xs text-slate-500">Latest {transactions.length}</span>
-        )}
+    <div className="surface p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+            Recent transactions
+          </h2>
+        </div>
+        <a href="/transactions" className="text-xs font-medium" style={{ color: "var(--accent)" }}>
+          View all →
+        </a>
       </div>
 
-      <div className="mt-4 space-y-1">
-        {transactions.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">
-            No transactions recorded yet.
-          </p>
-        ) : (
-          transactions.map((transaction) => (
-            <div
-              key={transaction.id}
-              className="flex items-center justify-between gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-slate-800/50"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">
-                  {transaction.description || transaction.category}
-                </p>
-                <p className="text-sm text-slate-400">
-                  {transaction.category} · {transaction.transaction_date}
-                </p>
+      {grouped.length === 0 ? (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>No transactions yet.</p>
+      ) : (
+        <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+          {grouped.map((t) => {
+            const isIncome = t.transaction_type === "income";
+            const isTransfer = t.transaction_type === "transfer_out" || t.transaction_type === "transfer_in";
+            const icon = isTransfer ? "🔄" : (CATEGORY_ICONS[t.category] ?? "📦");
+            const dateLabel = new Date(t.transaction_date).toLocaleDateString("en-TN", {
+              month: "short", day: "numeric",
+            });
+
+            return (
+              <div key={t.id} className="flex items-center gap-3 py-3">
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base"
+                  style={{ background: "var(--bg-subtle)" }}
+                >
+                  {icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                    {t.description || t.category}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    {isTransfer ? "Transfer" : t.category} · {dateLabel}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {isTransfer ? (
+                    <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--text-muted)" }}>
+                      {fmt(t.amount_millimes)}
+                    </span>
+                  ) : (
+                    <span
+                      className="text-sm font-semibold tabular-nums"
+                      style={{ color: isIncome ? "var(--success)" : "var(--danger)" }}
+                    >
+                      {isIncome ? "+" : "−"}{fmt(t.amount_millimes)}
+                    </span>
+                  )}
+                  <span
+                    className="text-[10px] font-medium rounded-full px-1.5 py-0.5 capitalize"
+                    style={{
+                      background: "color-mix(in srgb, var(--text-muted) 12%, transparent)",
+                      color: isTransfer ? "var(--text-muted)" : isIncome ? "var(--success)" : "var(--danger)",
+                    }}
+                  >
+                    {isTransfer ? "transfer" : t.transaction_type}
+                  </span>
+                </div>
               </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                <p
-                  className={`tabular-nums font-semibold ${
-                    transaction.transaction_type === "income"
-                      ? "text-emerald-400"
-                      : "text-rose-400"
-                  }`}
-                >
-                  {transaction.transaction_type === "income" ? "+" : "−"}
-                  {money(transaction.amount_millimes)}
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => onEdit(transaction)}
-                  className="rounded-md border border-slate-700 px-2 py-1 text-xs hover:bg-slate-800 transition-colors"
-                  aria-label={`Edit ${transaction.description || transaction.category}`}
-                >
-                  Edit
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onDelete(transaction.id)}
-                  className="rounded-md border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950 transition-colors"
-                  aria-label={`Delete ${transaction.description || transaction.category}`}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
