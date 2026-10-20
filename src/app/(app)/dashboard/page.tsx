@@ -59,6 +59,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   "ATM": "🏧",
   "Transfer": "🔄",
   "Banking": "🏦",
+  "Gaming": "🎮",
 };
 
 /* ── helpers ─────────────────────────────────── */
@@ -180,6 +181,7 @@ export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [monthlyChart, setMonthlyChart] = useState<{ month: string; income: number; expenses: number }[]>([]);
   const [categoryMonth, setCategoryMonth] = useState<string>("");
+  const [futureTransactions, setFutureTransactions] = useState<Transaction[]>([]);
 
 
   const load = useCallback(async () => {
@@ -197,6 +199,7 @@ export default function DashboardPage() {
       setAccounts(dash.balances ?? []);
       setTransactions(dash.transactions ?? []);
       setMonthlyChart(dash.monthlyChart ?? []);
+      setFutureTransactions(dash.futureTransactions ?? []);
       setInstallmentPurchases(inst.purchases ?? []);
       setInstallmentPayments(inst.payments ?? []);
     } catch {
@@ -281,6 +284,11 @@ export default function DashboardPage() {
   })();
 
   const totalBalance = accounts.reduce((s, a) => s + a.balance_millimes, 0);
+  const projectedBalance = futureTransactions.reduce((sum, t) => {
+    if (t.transaction_type === "income") return sum + t.amount_millimes;
+    if (t.transaction_type === "expense") return sum - t.amount_millimes;
+    return sum;
+  }, totalBalance);
 
   const now = currentDate;
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -457,6 +465,63 @@ export default function DashboardPage() {
           accent="amber"
         />
       </div>
+      
+      {/* ── Planned transactions ── */}
+      {futureTransactions.length > 0 && (
+        <div className="surface p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <SectionHeader
+              title="Planned transactions"
+              sub={`${futureTransactions.length} upcoming · projected balance: ${fmt(projectedBalance)}`}
+            />
+          </div>
+          <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+            {(() => {
+              const sortedFuture = [...futureTransactions].sort((a, b) =>
+                a.transaction_date.localeCompare(b.transaction_date)
+              );
+              let running = totalBalance;
+              const futureWithRunning = sortedFuture.map((t) => {
+                if (t.transaction_type === "income") running += t.amount_millimes;
+                else if (t.transaction_type === "expense") running -= t.amount_millimes;
+                return { ...t, runningBalance: running };
+              });
+              return futureWithRunning.slice(0, 5).map((t) => {
+                const isIncome = t.transaction_type === "income";
+                return (
+                  <div key={t.id} className="flex items-center gap-3 py-3">
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base"
+                      style={{ background: "var(--bg-subtle)" }}
+                    >
+                      {CATEGORY_ICONS[t.category] ?? "📦"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                        {t.description || t.category}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                        {t.category} · {t.transaction_date}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span
+                        className="text-sm font-semibold tabular-nums"
+                        style={{ color: isIncome ? "var(--success)" : "var(--danger)" }}
+                      >
+                        {isIncome ? "+" : "−"}{fmt(t.amount_millimes)}
+                      </span>
+                      <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                        → {fmt(t.runningBalance)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* ── Charts ── */}
       <div className="grid gap-6 lg:grid-cols-5">
