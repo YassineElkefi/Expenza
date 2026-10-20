@@ -4,6 +4,27 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Alert";
 import { AccountPicker } from "./ui/AccountPicker";
+import {
+  Utensils,
+  Car,
+  ShoppingBag,
+  ShoppingCart,
+  Pill,
+  House,
+  Clapperboard,
+  Zap,
+  BriefcaseBusiness,
+  Laptop,
+  Package,
+  Landmark,
+  ArrowLeftRight,
+  Gamepad2,
+  type LucideIcon,
+  Search,
+  Groceries,
+  CreditCardReader,
+  CalendarClock
+} from "lucide-react";
 
 type Account = {
   id: string;
@@ -37,22 +58,24 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
-const CATEGORY_ICONS: Record<string, string> = {
-  "Food": "🍽️",
-  "Transport": "🚗",
-  "Shopping": "🛍️",
-  "E-Shopping": "🛒",
-  "Health": "💊",
-  "Housing": "🏠",
-  "Entertainment": "🎬",
-  "Utilities": "⚡",
-  "Salary": "💼",
-  "Freelance": "💻",
-  "Other": "📦",
-  "ATM": "🏧",
-  "Transfer": "🔄",
-  "Banking": "🏦",
-  "Gaming": "🎮",
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Food: Utensils,
+  Transport: Car,
+  Shopping: ShoppingBag,
+  "E-Shopping": CreditCardReader,
+  Health: Pill,
+  Housing: House,
+  Entertainment: Clapperboard,
+  Utilities: Zap,
+  Salary: BriefcaseBusiness,
+  Freelance: Laptop,
+  Other: Package,
+  ATM: Landmark,
+  Transfer: ArrowLeftRight,
+  Banking: Landmark,
+  Gaming: Gamepad2,
+  Groceries: Groceries,
+  "Installment payment": CalendarClock,
 };
 
 const TYPE_CONFIG: Record<
@@ -263,7 +286,9 @@ export default function TransactionHistory({
           </div>
         ) : transactions.length === 0 ? (
           <div className="py-12 text-center">
-            <p className="text-3xl">🔍</p>
+            <div className="flex justify-center" style={{ color: "var(--text-muted)" }}>
+              <Search size={28} strokeWidth={1.8} />
+            </div>
             <p className="mt-2 text-sm font-medium" style={{ color: "var(--text-primary)" }}>
               No transactions found
             </p>
@@ -282,10 +307,9 @@ export default function TransactionHistory({
               const isTransfer =
                 t.transaction_type === "transfer_in" ||
                 t.transaction_type === "transfer_out";
-              const icon =
-                isTransfer
-                  ? "🔄"
-                  : (CATEGORY_ICONS[t.category] ?? "📦");
+              const Icon = isTransfer
+                ? ArrowLeftRight
+                : (CATEGORY_ICONS[t.category] ?? Package);
 
               const date = new Date(t.transaction_date);
               const dateLabel = date.toLocaleDateString("en-TN", {
@@ -303,10 +327,13 @@ export default function TransactionHistory({
                 >
                   {/* Icon */}
                   <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg"
-                    style={{ background: "var(--bg-subtle)" }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                    style={{
+                      background: "var(--bg-subtle)",
+                      color: "var(--text-muted)",
+                    }}
                   >
-                    {icon}
+                    <Icon size={20} strokeWidth={1.8} />
                   </div>
 
                   {/* Description + meta */}

@@ -1,8 +1,42 @@
-const CATEGORY_ICONS: Record<string, string> = {
-  Food: "🍽️", Transport: "🚗", Shopping: "🛍️", "E-Shopping": "🛒",
-  Health: "💊", Housing: "🏠", Entertainment: "🎬", Utilities: "⚡",
-  Salary: "💼", Freelance: "💻", Other: "📦", ATM: "🏧",
-  Transfer: "🔄", Banking: "🏦", Gaming: "🎮",
+import {
+  Utensils,
+  Car,
+  ShoppingBag,
+  ShoppingCart,
+  Pill,
+  House,
+  Clapperboard,
+  Zap,
+  BriefcaseBusiness,
+  Laptop,
+  Package,
+  Landmark,
+  ArrowLeftRight,
+  Gamepad2,
+  type LucideIcon,
+  Groceries,
+  CreditCardReader,
+  CalendarClock,
+} from "lucide-react";
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Food: Utensils,
+  Transport: Car,
+  Shopping: ShoppingBag,
+  "E-Shopping": CreditCardReader,
+  Health: Pill,
+  Housing: House,
+  Entertainment: Clapperboard,
+  Utilities: Zap,
+  Salary: BriefcaseBusiness,
+  Freelance: Laptop,
+  Other: Package,
+  ATM: Landmark,
+  Transfer: ArrowLeftRight,
+  Banking: Landmark,
+  Gaming: Gamepad2,
+  Groceries: Groceries,
+  "Installment payment": CalendarClock,
 };
 
 type Transaction = {
@@ -73,7 +107,9 @@ export function RecentTransactions({ transactions, fmt }: Props) {
           {grouped.map((t) => {
             const isIncome = t.transaction_type === "income";
             const isTransfer = t.transaction_type === "transfer_out" || t.transaction_type === "transfer_in";
-            const icon = isTransfer ? "🔄" : (CATEGORY_ICONS[t.category] ?? "📦");
+            const Icon = isTransfer
+              ? ArrowLeftRight
+              : (CATEGORY_ICONS[t.category] ?? Package);
             const dateLabel = new Date(t.transaction_date).toLocaleDateString("en-TN", {
               month: "short", day: "numeric",
             });
@@ -81,10 +117,13 @@ export function RecentTransactions({ transactions, fmt }: Props) {
             return (
               <div key={t.id} className="flex items-center gap-3 py-3">
                 <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base"
-                  style={{ background: "var(--bg-subtle)" }}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: "var(--bg-subtle)",
+                    color: "var(--text-muted)",
+                  }}
                 >
-                  {icon}
+                  <Icon size={18} strokeWidth={1.8} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium" style={{ color: "var(--text-primary)" }}>

@@ -16,6 +16,8 @@ import { AccountsPanel } from "@/components/dashboard/AccountsPanel";
 import { StatsRow } from "@/components/dashboard/StatsRow";
 import { PlannedTransactions } from "@/components/dashboard/PlannedTransactions";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
+import { ExportDialog } from "@/components/ui/ExportDialog";
+
 
 /* ── types ──────────────────────────────────── */
 
@@ -47,24 +49,6 @@ type InstallmentPayment = {
 type InstallmentPurchase = {
   id: string;
   name: string;
-};
-
-const CATEGORY_ICONS: Record<string, string> = {
-  "Food": "🍽️",
-  "Transport": "🚗",
-  "Shopping": "🛍️",
-  "E-Shopping": "🛒",
-  "Health": "💊",
-  "Housing": "🏠",
-  "Entertainment": "🎬",
-  "Utilities": "⚡",
-  "Salary": "💼",
-  "Freelance": "💻",
-  "Other": "📦",
-  "ATM": "🏧",
-  "Transfer": "🔄",
-  "Banking": "🏦",
-  "Gaming": "🎮",
 };
 
 /* ── helpers ─────────────────────────────────── */
@@ -187,6 +171,8 @@ export default function DashboardPage() {
   const [monthlyChart, setMonthlyChart] = useState<{ month: string; income: number; expenses: number }[]>([]);
   const [categoryMonth, setCategoryMonth] = useState<string>("");
   const [futureTransactions, setFutureTransactions] = useState<Transaction[]>([]);
+  const [showExport, setShowExport] = useState(false);
+
 
 
   const load = useCallback(async () => {
@@ -373,6 +359,14 @@ export default function DashboardPage() {
     .filter((p) => p.status === "unpaid")
     .reduce((s, p) => s + p.amountMillimes, 0);
 
+  const incomeEntries = categoryMonthTx.filter(
+    (t) => t.transaction_type === "income"
+  ).length;
+
+  const topCategory = categoryData[0]?.name ?? "";
+
+  const nextInstallment = upcomingInstallments[0] ?? null;
+
   // Recent 5 transactions
   const recentTx = [...transactions]
     .sort((a, b) => b.transaction_date.localeCompare(a.transaction_date))
@@ -441,7 +435,12 @@ export default function DashboardPage() {
           unpaidCount={installmentPayments.filter((p) => p.status === "unpaid").length}
           safeToSpend={safeToSpend}
           reserveBuffer={RESERVE_BUFFER}
-          fmt={fmt} accounts={[]}        
+          fmt={fmt} accounts={[]}
+          onExport={() => setShowExport(true)}
+          incomeEntries={incomeEntries}
+          topCategory={topCategory}
+          nextInstallmentDate={nextInstallment?.dueDate ?? null}
+          nextInstallmentAmount={nextInstallment?.amountMillimes ?? null} 
         />
       </div>
       
@@ -662,6 +661,7 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
     </div>
   );
 }
