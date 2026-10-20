@@ -80,21 +80,26 @@ export async function GET(request: Request) {
     }
 
     const type = searchParams.get("type");
-    const accountId = searchParams.get("accountId");
+    const rawAccountIds = searchParams.get("accountIds");
+    const accountIds = rawAccountIds
+      ? rawAccountIds.split(",").filter(id => /^[a-f\d]{24}$/i.test(id))
+      : [];
     const rawCategory = searchParams.get("category");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    if (type !== null && type !== "income" && type !== "expense") {
+   const VALID_TYPES = ["income", "expense", "transfer_in", "transfer_out"];
+
+    if (type !== null && !VALID_TYPES.includes(type)) {
       return NextResponse.json(
-        { error: "Type must be income or expense." },
+        { error: "Type must be income, expense, transfer_in, or transfer_out." },
         { status: 400 }
       );
     }
 
     if (
-      accountId !== null &&
-      !/^[a-f\d]{24}$/i.test(accountId)
+      accountIds.length > 0 &&
+      !accountIds.every(id => /^[a-f\d]{24}$/i.test(id))
     ) {
       return NextResponse.json(
         { error: "Invalid account ID." },
@@ -135,9 +140,9 @@ export async function GET(request: Request) {
 
     // If an account filter is supplied, verify that it belongs
     // to the authenticated user before querying transactions.
-    if (accountId) {
+    if (accountIds.length > 0) {
       const account = await db.collection("accounts").findOne({
-        _id: new ObjectId(accountId),
+        _id: { $in: accountIds.map(id => new ObjectId(id)) },
         userId: user.id,
       });
 
@@ -157,8 +162,15 @@ export async function GET(request: Request) {
       filter.transactionType = type;
     }
 
-    if (accountId) {
-      filter.accountId = accountId;
+    if (accountIds.length > 0) {
+      const found = await db.collection("accounts").countDocuments({
+        _id: { $in: accountIds.map(id => new ObjectId(id)) },
+        userId: user.id,
+      });
+      if (found !== accountIds.length) {
+        return NextResponse.json({ error: "One or more accounts not found." }, { status: 404 });
+      }
+      filter.accountId = { $in: accountIds };
     }
 
     if (category) {

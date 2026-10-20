@@ -2,6 +2,8 @@
 "use client";
 
 import { useState } from "react";
+import { FormField } from "@/components/ui/FormField";
+import { ui } from "@/lib/theme";
 
 type AccountOption = {
   id: string;
@@ -139,100 +141,72 @@ export default function AddTransactionForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="transaction-type" className="mb-1 block text-sm font-medium">
-          Transaction type
-        </label>
-        <select
-          id="transaction-type"
-          value={transactionType}
-          onChange={(e) => setTransactionType(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        >
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-        </select>
-      </div>
+      <FormField
+        as="select"
+        id="transaction-type"
+        label="Transaction type"
+        value={transactionType}
+        onChange={(e) => setTransactionType((e.target as HTMLSelectElement).value)}
+      >
+        <option value="expense">Expense</option>
+        <option value="income">Income</option>
+      </FormField>
 
-      <div>
-        <label htmlFor="transaction-account" className="mb-1 block text-sm font-medium">
-          Account
-        </label>
-        <select
-          id="transaction-account"
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          required
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        >
-          <option value="">Choose an account</option>
-          {accounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <FormField
+        as="select"
+        id="transaction-account"
+        label="Account"
+        value={accountId}
+        onChange={(e) => setAccountId((e.target as HTMLSelectElement).value)}
+        required
+      >
+        <option value="">Choose an account</option>
+        {accounts.map((account) => (
+          <option key={account.id} value={account.id}>
+            {account.name}
+          </option>
+        ))}
+      </FormField>
 
-      <div>
-        <label htmlFor="transaction-amount" className="mb-1 block text-sm font-medium">
-          Amount (TND)
-        </label>
-        <input
-          id="transaction-amount"
-          type="number"
-          min="0.001"
-          step="0.001"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="e.g. 45.500"
-          required
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        />
-      </div>
+      <FormField
+        id="transaction-amount"
+        label="Amount (TND)"
+        type="number"
+        min="0.001"
+        step="0.001"
+        value={amount}
+        onChange={(e) => setAmount((e.target as HTMLInputElement).value)}
+        placeholder="e.g. 45.500"
+        required
+      />
 
-      <div>
-        <label htmlFor="transaction-category" className="mb-1 block text-sm font-medium">
-          Category
-        </label>
-        <input
-          id="transaction-category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          maxLength={50}
-          placeholder="e.g. Food, Salary, Transport"
-          required
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        />
-      </div>
+      <FormField
+        id="transaction-category"
+        label="Category"
+        value={category}
+        onChange={(e) => setCategory((e.target as HTMLInputElement).value)}
+        maxLength={50}
+        placeholder="e.g. Food, Salary, Transport"
+        required
+      />
 
-      <div>
-        <label htmlFor="transaction-date" className="mb-1 block text-sm font-medium">
-          Date
-        </label>
-        <input
-          id="transaction-date"
-          type="date"
-          value={transactionDate}
-          onChange={(e) => setTransactionDate(e.target.value)}
-          required
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        />
-      </div>
+      <FormField
+        id="transaction-date"
+        label="Date"
+        type="date"
+        value={transactionDate}
+        onChange={(e) => setTransactionDate((e.target as HTMLInputElement).value)}
+        required
+      />
 
-      <div>
-        <label htmlFor="transaction-description" className="mb-1 block text-sm font-medium">
-          Description (optional)
-        </label>
-        <input
-          id="transaction-description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          maxLength={500}
-          placeholder="e.g. Weekly groceries"
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        />
-      </div>
+      <FormField
+        id="transaction-description"
+        label="Description (optional)"
+        value={description}
+        onChange={(e) => setDescription((e.target as HTMLInputElement).value)}
+        maxLength={500}
+        placeholder="e.g. Weekly groceries"
+      />
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {success && <p role="status" className="text-sm text-green-700">{success}</p>}
@@ -240,7 +214,7 @@ export default function AddTransactionForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+        className={ui.btnPrimary}
       >
       {loading
         ? isEditing ? "Updating..." : "Saving..."

@@ -1,11 +1,11 @@
-
 "use client";
 
 import { useState } from "react";
+import { FormField } from "@/components/ui/FormField";
+import { Alert } from "@/components/ui/Alert";
+import { ui } from "@/lib/theme";
 
-type Props = {
-  onCreated: () => void;
-};
+type Props = { onCreated: () => void };
 
 export default function AddAccountForm({ onCreated }: Props) {
   const [name, setName] = useState("");
@@ -38,7 +38,6 @@ export default function AddAccountForm({ onCreated }: Props) {
     }
 
     setLoading(true);
-
     try {
       const response = await fetch("/api/accounts", {
         method: "POST",
@@ -51,7 +50,6 @@ export default function AddAccountForm({ onCreated }: Props) {
       });
 
       const result = await response.json();
-
       if (!response.ok) {
         setError(result.error ?? "Could not create the account.");
         return;
@@ -71,63 +69,45 @@ export default function AddAccountForm({ onCreated }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="account-name" className="mb-1 block text-sm font-medium">
-          Account name
-        </label>
-        <input
-          id="account-name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={100}
-          placeholder="e.g. My bank account"
-          required
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        />
-      </div>
+      <FormField
+        id="account-name"
+        label="Account name"
+        value={name}
+        onChange={(e) => setName((e.target as HTMLInputElement).value)}
+        maxLength={100}
+        placeholder="e.g. My bank account"
+        required
+      />
 
-      <div>
-        <label htmlFor="account-type" className="mb-1 block text-sm font-medium">
-          Account type
-        </label>
-        <select
-          id="account-type"
-          value={accountType}
-          onChange={(e) => setAccountType(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        >
-          <option value="bank">Bank account</option>
-          <option value="cash">Cash wallet</option>
-          <option value="savings">Savings</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-
-      <div>
-        <label htmlFor="account-balance" className="mb-1 block text-sm font-medium">
-          Current balance (TND)
-        </label>
-        <input
-          id="account-balance"
-          type="number"
-          min="0"
-          step="0.001"
-          value={balance}
-          onChange={(e) => setBalance(e.target.value)}
-          placeholder="1250.500"
-          required
-          className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2"
-        />
-      </div>
-
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      {success && <p role="status" className="text-sm text-green-700">{success}</p>}
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+      <FormField
+        as="select"
+        id="account-type"
+        label="Account type"
+        value={accountType}
+        onChange={(e) => setAccountType((e.target as HTMLSelectElement).value)}
       >
+        <option value="bank">Bank account</option>
+        <option value="cash">Cash wallet</option>
+        <option value="savings">Savings</option>
+        <option value="other">Other</option>
+      </FormField>
+
+      <FormField
+        id="account-balance"
+        label="Current balance (TND)"
+        type="number"
+        min="0"
+        step="0.001"
+        value={balance}
+        onChange={(e) => setBalance((e.target as HTMLInputElement).value)}
+        placeholder="1250.500"
+        required
+      />
+
+      {error && <Alert type="error">{error}</Alert>}
+      {success && <Alert type="success">{success}</Alert>}
+
+      <button type="submit" disabled={loading} className={ui.btnPrimary}>
         {loading ? "Creating..." : "Add account"}
       </button>
     </form>

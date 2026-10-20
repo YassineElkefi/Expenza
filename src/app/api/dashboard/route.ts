@@ -102,7 +102,7 @@ export async function GET() {
     const obligationsCollection =
       db.collection<ObligationDocument>("obligations");
 
-    const [accounts, recentTransactions, futureTransactions, obligations, allBalances, monthlyTotals] =
+    const [accounts, recentTransactions, futureTransactions, obligations, allBalances, monthlyTotals, monthlyChart] =
       await Promise.all([
         accountsCollection
           .find({ userId })
@@ -110,9 +110,19 @@ export async function GET() {
           .toArray(),
 
         transactionsCollection
-          .find({ userId, transactionDate: { $lte: today } })
+          .find({
+            userId,
+            transactionDate: {
+              $gte: (() => {
+                const d = new Date();
+                d.setUTCMonth(d.getUTCMonth() - 5);
+                d.setUTCDate(1);
+                return d.toISOString().slice(0, 10);
+              })(),
+              $lte: today,
+            },
+          })
           .sort({ transactionDate: -1, _id: -1 })
-          .limit(10)
           .toArray(),
 
         transactionsCollection
@@ -143,7 +153,7 @@ export async function GET() {
                 income: {
                   $sum: {
                     $cond: [
-                      { $eq: ["$transactionType", "income"] },
+                      { $in: ["$transactionType", ["income", "transfer_in"]] },
                       "$amountMillimes",
                       0,
                     ],
@@ -152,7 +162,7 @@ export async function GET() {
                 expense: {
                   $sum: {
                     $cond: [
-                      { $eq: ["$transactionType", "expense"] },
+                      { $in: ["$transactionType", ["expense", "transfer_out"]] },
                       "$amountMillimes",
                       0,
                     ],
@@ -176,6 +186,7 @@ export async function GET() {
                   $lt: end,
                   $lte: today,
                 },
+                transactionType: { $in: ["income", "expense"] },
               },
             },
             {
@@ -186,6 +197,39 @@ export async function GET() {
             },
           ])
           .toArray(),
+
+        transactionsCollection
+          .aggregate<{ _id: string; income: number; expenses: number }>([
+            {
+              $match: {
+                userId,
+                transactionType: { $in: ["income", "expense"] },
+                transactionDate: {
+                  // Last 6 months — compute the cutoff as a YYYY-MM-DD string
+                  $gte: (() => {
+                    const d = new Date();
+                    d.setUTCMonth(d.getUTCMonth() - 5);
+                    d.setUTCDate(1);
+                    return d.toISOString().slice(0, 10); // e.g. "2026-05-01"
+                  })(),
+                  $lte: today,
+                },
+              },
+            },
+            {
+              $group: {
+                _id: { $substr: ["$transactionDate", 0, 7] }, // "YYYY-MM"
+                income: {
+                  $sum: { $cond: [{ $eq: ["$transactionType", "income"] }, "$amountMillimes", 0] },
+                },
+                expenses: {
+                  $sum: { $cond: [{ $eq: ["$transactionType", "expense"] }, "$amountMillimes", 0] },
+                },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ])
+        .toArray(),
       ]);
 
     const totalsByAccount = new Map(
@@ -263,6 +307,11 @@ export async function GET() {
         amount_millimes: obligation.amountMillimes,
         next_due_date: toDateString(obligation.nextDueDate),
       })),
+      monthlyChart: monthlyChart.map((m) => ({
+          month: m._id,
+          income: m.income,
+          expenses: m.expenses,
+        })),
     });
   } catch (error) {
     console.error("Dashboard API error:", error);
