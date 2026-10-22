@@ -1,8 +1,30 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Alert } from "@/components/ui/Alert";
+import { AccountPicker } from "./ui/AccountPicker";
+import {
+  Utensils,
+  Car,
+  ShoppingBag,
+  ShoppingCart,
+  Pill,
+  House,
+  Clapperboard,
+  Zap,
+  BriefcaseBusiness,
+  Laptop,
+  Package,
+  Landmark,
+  ArrowLeftRight,
+  Gamepad2,
+  type LucideIcon,
+  Search,
+  Groceries,
+  CreditCardReader,
+  CalendarClock
+} from "lucide-react";
 
 type Account = {
   id: string;
@@ -36,6 +58,36 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Food: Utensils,
+  Transport: Car,
+  Shopping: ShoppingBag,
+  "E-Shopping": CreditCardReader,
+  Health: Pill,
+  Housing: House,
+  Entertainment: Clapperboard,
+  Utilities: Zap,
+  Salary: BriefcaseBusiness,
+  Freelance: Laptop,
+  Other: Package,
+  ATM: Landmark,
+  Transfer: ArrowLeftRight,
+  Banking: Landmark,
+  Gaming: Gamepad2,
+  Groceries: Groceries,
+  "Installment payment": CalendarClock,
+};
+
+const TYPE_CONFIG: Record<
+  string,
+  { label: string; sign: "+" | "−" | null; color: string }
+> = {
+  income:       { label: "Income",     sign: "+", color: "var(--success)" },
+  expense:      { label: "Expense",    sign: "−", color: "var(--danger)"  },
+  transfer_in:  { label: "Transfer ←", sign: "+", color: "var(--accent)"  },
+  transfer_out: { label: "Transfer →", sign: "−", color: "var(--accent)"  },
+};
+
 const money = (millimes: number) =>
   new Intl.NumberFormat("fr-TN", {
     style: "currency",
@@ -56,7 +108,7 @@ export default function TransactionHistory({
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [page, setPage] = useState(1);
   const [type, setType] = useState("");
-  const [accountId, setAccountId] = useState("");
+  const [accountIds, setAccountIds] = useState<string[]>([]);
   const [category, setCategory] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -71,273 +123,318 @@ export default function TransactionHistory({
       setError("");
 
       try {
-        const params = new URLSearchParams({
-          page: String(page),
-          limit: "20",
-        });
-
+        const params = new URLSearchParams({ page: String(page), limit: "20" });
         if (type) params.set("type", type);
-        if (accountId) params.set("accountId", accountId);
+        if (accountIds.length > 0) params.set("accountIds", accountIds.join(","));
         if (category.trim()) params.set("category", category.trim());
         if (from) params.set("from", from);
         if (to) params.set("to", to);
 
         const response = await fetch(
           `/api/transactions/history?${params.toString()}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          }
+          { cache: "no-store", signal: controller.signal }
         );
 
-        if (response.status === 401) {
-          router.replace("/login");
-          return;
-        }
+        if (response.status === 401) { router.replace("/login"); return; }
 
         const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            result.error ?? "Could not load transaction history."
-          );
-        }
+        if (!response.ok) throw new Error(result.error ?? "Could not load transaction history.");
 
         setTransactions(result.transactions ?? []);
         setPagination(result.pagination ?? null);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Could not load transaction history."
-        );
+        setError(err instanceof Error ? err.message : "Could not load transaction history.");
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
     void loadHistory();
-
     return () => controller.abort();
-  }, [page, type, accountId, category, from, to, refreshKey, router]);
+  }, [page, type, accountIds, category, from, to, refreshKey, router]);
 
   function resetFilters() {
     setType("");
-    setAccountId("");
+    setAccountIds([]);
     setCategory("");
     setFrom("");
     setTo("");
     setPage(1);
   }
 
-  const accountNames = new Map(
-    accounts.map((account) => [account.id, account.name])
-  );
+  const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
+
+  const hasActiveFilters = type || accountIds.length > 0 || category || from || to;
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+    <section className="surface p-5">
+      {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Transaction history</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Search and browse all your recorded transactions.
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+            Transaction history
+          </h2>
+          <p className="mt-0.5 text-sm" style={{ color: "var(--text-secondary)" }}>
+            {pagination?.total ?? 0} transactions found
           </p>
         </div>
 
-        <span className="text-sm text-slate-400">
-          {pagination?.total ?? 0} transactions
-        </span>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="text-sm text-slate-300">
-          Transaction type
-          <select
-            value={type}
-            onChange={(event) => {
-              setType(event.target.value);
-              setPage(1);
-            }}
-            className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-          >
-            <option value="">All types</option>
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
-          </select>
-        </label>
-
-        <label className="text-sm text-slate-300">
-          Account
-          <select
-            value={accountId}
-            onChange={(event) => {
-              setAccountId(event.target.value);
-              setPage(1);
-            }}
-            className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-          >
-            <option value="">All accounts</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-sm text-slate-300">
-          Category
-          <input
-            value={category}
-            onChange={(event) => {
-              setCategory(event.target.value);
-              setPage(1);
-            }}
-            placeholder="e.g. Food"
-            maxLength={50}
-            className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white placeholder:text-slate-500"
-          />
-        </label>
-
-        <label className="text-sm text-slate-300">
-          From date
-          <input
-            type="date"
-            value={from}
-            max={to || undefined}
-            onChange={(event) => {
-              setFrom(event.target.value);
-              setPage(1);
-            }}
-            className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-          />
-        </label>
-
-        <label className="text-sm text-slate-300">
-          To date
-          <input
-            type="date"
-            value={to}
-            min={from || undefined}
-            onChange={(event) => {
-              setTo(event.target.value);
-              setPage(1);
-            }}
-            className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-          />
-        </label>
-
-        <div className="flex items-end">
+        {hasActiveFilters && (
           <button
             type="button"
             onClick={resetFilters}
-            className="w-full rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
+            className="text-xs font-medium"
+            style={{ color: "var(--accent)" }}
           >
             Clear filters
           </button>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div
+        className="mt-4 rounded-xl p-4"
+        style={{ background: "var(--bg-subtle)" }}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="field-label">
+            Type
+            <select
+              value={type}
+              onChange={(e) => { setType(e.target.value); setPage(1); }}
+              className="input mt-1"
+            >
+              <option value="">All types</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+              <option value="transfer_in">Transfer ←</option>
+              <option value="transfer_out">Transfer →</option>
+            </select>
+          </label>
+
+          <label className="field-label">
+            Account
+            <div className="mt-1">
+              <AccountPicker
+                accounts={accounts}
+                value={accountIds}
+                onChange={(ids) => { setAccountIds(ids); setPage(1); }}
+              />
+            </div>
+          </label>
+
+          <label className="field-label">
+            Category
+            <input
+              value={category}
+              onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+              placeholder="e.g. Food"
+              maxLength={50}
+              className="input mt-1"
+            />
+          </label>
+
+          <label className="field-label">
+            From
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => { setFrom(e.target.value); setPage(1); }}
+              className="input mt-1"
+            />
+          </label>
+
+          <label className="field-label">
+            To
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => { setTo(e.target.value); setPage(1); }}
+              className="input mt-1"
+            />
+          </label>
         </div>
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 rounded-lg border border-red-900 p-3 text-sm text-red-300">
-          {error}
-        </p>
+        <div className="mt-4">
+          <Alert type="error">{error}</Alert>
+        </div>
       )}
 
-      <div className="mt-5">
+      {/* List */}
+      <div className="mt-4">
         {loading ? (
-          <p className="py-8 text-center text-sm text-slate-400">
-            Loading transactions...
-          </p>
-        ) : transactions.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">
-            No transactions match these filters.
-          </p>
-        ) : (
-          <div className="divide-y divide-slate-800">
-            {transactions.map((transaction) => (
+          <div className="flex flex-col gap-3 py-2">
+            {Array.from({ length: 5 }).map((_, i) => (
               <div
-                key={transaction.id}
-                className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                key={i}
+                className="flex items-center gap-3 rounded-xl p-3"
+                style={{ background: "var(--bg-subtle)", opacity: 1 - i * 0.15 }}
               >
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {transaction.description || transaction.category}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {transaction.category}
-                    {" · "}
-                    {accountNames.get(transaction.account_id) ?? "Account"}
-                    {" · "}
-                    {transaction.transaction_date}
-                  </p>
+                <div className="h-10 w-10 shrink-0 rounded-full" style={{ background: "var(--border)" }} />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-2/5 rounded" style={{ background: "var(--border)" }} />
+                  <div className="h-2.5 w-1/3 rounded" style={{ background: "var(--border)" }} />
                 </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <p
-                    className={
-                      transaction.transaction_type === "income"
-                        ? "font-semibold text-emerald-400"
-                        : "font-semibold text-rose-400"
-                    }
-                  >
-                    {transaction.transaction_type === "income" ? "+" : "−"}
-                    {money(transaction.amount_millimes)}
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={() => onEdit(transaction)}
-                    className="rounded-md border border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-800"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onDelete(transaction.id)}
-                    className="rounded-md border border-red-900 px-3 py-1.5 text-sm text-red-400 hover:bg-red-950"
-                  >
-                    Delete
-                  </button>
-                </div>
+                <div className="h-4 w-20 rounded" style={{ background: "var(--border)" }} />
               </div>
             ))}
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="py-12 text-center">
+            <div className="flex justify-center" style={{ color: "var(--text-muted)" }}>
+              <Search size={28} strokeWidth={1.8} />
+            </div>
+            <p className="mt-2 text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              No transactions found
+            </p>
+            <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+              Try adjusting your filters
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+            {transactions.map((t) => {
+              const cfg = TYPE_CONFIG[t.transaction_type] ?? {
+                label: t.transaction_type,
+                sign: null,
+                color: "var(--text-secondary)",
+              };
+              const isTransfer =
+                t.transaction_type === "transfer_in" ||
+                t.transaction_type === "transfer_out";
+              const Icon = isTransfer
+                ? ArrowLeftRight
+                : (CATEGORY_ICONS[t.category] ?? Package);
+
+              const date = new Date(t.transaction_date);
+              const dateLabel = date.toLocaleDateString("en-TN", {
+                month: "short",
+                day: "numeric",
+                year: date.getFullYear() !== new Date().getFullYear()
+                  ? "numeric"
+                  : undefined,
+              });
+
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3 py-3"
+                >
+                  {/* Icon */}
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                    style={{
+                      background: "var(--bg-subtle)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    <Icon size={20} strokeWidth={1.8} />
+                  </div>
+
+                  {/* Description + meta */}
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate text-sm font-medium"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {t.description || t.category}
+                    </p>
+                    <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {t.category}
+                      {" · "}
+                      {accountNames.get(t.account_id) ?? "Account"}
+                      {" · "}
+                      {dateLabel}
+                    </p>
+                  </div>
+
+                  {/* Right side: amount + type badge + actions */}
+                  <div className="flex shrink-0 items-center gap-3">
+                    {/* Amount + badge stacked */}
+                    <div className="flex flex-col items-end gap-1">
+                      <span
+                        className="text-sm font-semibold tabular-nums"
+                        style={{ color: cfg.color }}
+                      >
+                        {cfg.sign}{money(t.amount_millimes)}
+                      </span>
+                      <span
+                        className="text-[10px] font-medium rounded-full px-1.5 py-px"
+                        style={{
+                          background: `color-mix(in srgb, ${cfg.color} 12%, transparent)`,
+                          color: cfg.color,
+                        }}
+                      >
+                        {cfg.label}
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(t)}
+                        disabled={isTransfer}
+                        title={isTransfer ? "Transfers can't be edited individually" : undefined}
+                        className="btn btn-secondary btn-sm"
+                        style={isTransfer ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(t.id)}
+                        disabled={isTransfer}
+                        title={isTransfer ? "Transfers can't be deleted individually" : undefined}
+                        className="btn btn-danger btn-sm"
+                        style={isTransfer ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
-        <p className="text-sm text-slate-400">
-          Page {pagination && pagination.totalPages > 0 ? pagination.page : 0}
-          {" of "}
-          {pagination?.totalPages ?? 0}
-        </p>
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Page {pagination.totalPages > 0 ? pagination.page : 0} of {pagination.totalPages}
+          </p>
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={!pagination?.hasPreviousPage || loading}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
-
-          <button
-            type="button"
-            disabled={!pagination?.hasNextPage || loading}
-            onClick={() => setPage((current) => current + 1)}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={!pagination.hasPreviousPage || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="btn btn-secondary btn-sm"
+            >
+              ← Previous
+            </button>
+            <button
+              type="button"
+              disabled={!pagination.hasNextPage || loading}
+              onClick={() => setPage((p) => p + 1)}
+              className="btn btn-secondary btn-sm"
+            >
+              Next →
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

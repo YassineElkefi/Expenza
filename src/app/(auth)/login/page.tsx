@@ -3,6 +3,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Alert } from "@/components/ui/Alert";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,7 +35,7 @@ export default function LoginPage() {
         throw new Error(result.error ?? "Authentication failed.");
       }
 
-      router.replace("/");
+      router.replace("/dashboard");
       router.refresh();
     } catch (error) {
       setMessage(
@@ -45,36 +47,38 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-white">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md space-y-5 rounded-2xl border border-slate-800 bg-slate-900 p-8"
-      >
+    <main className="relative flex min-h-screen items-center justify-center bg-base p-6 text-primary">
+      <div className="absolute right-6 top-6">
+        <ThemeToggle />
+      </div>
+      <form onSubmit={handleSubmit} className="surface w-full max-w-md space-y-5 p-6 sm:p-8">
         <div>
-          <p className="text-sm font-semibold text-emerald-400">EXPENZA</p>
+          <p className="text-accent text-sm font-semibold tracking-widest">EXPENZA</p>
           <h1 className="mt-2 text-3xl font-bold">
             {mode === "login" ? "Welcome back" : "Create your account"}
           </h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="text-secondary mt-2 text-sm">
             Your personal finances, all in one place.
           </p>
         </div>
 
-        <label className="block space-y-2 text-sm">
+        <label htmlFor="email" className="field-label">
           Email address
           <input
+            id="email"
             type="email"
             required
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 outline-none focus:border-emerald-400"
+            className="input mt-2"
           />
         </label>
 
-        <label className="block space-y-2 text-sm">
+        <label htmlFor="password" className="field-label">
           Password
           <input
+            id="password"
             type="password"
             required
             minLength={8}
@@ -84,20 +88,16 @@ export default function LoginPage() {
             }
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 outline-none focus:border-emerald-400"
+            className="input mt-2"
           />
         </label>
 
-        {message && (
-          <p role="status" className="text-sm text-amber-300">
-            {message}
-          </p>
-        )}
+        {message && <Alert type="error">{message}</Alert>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-emerald-400 p-3 font-semibold text-slate-950 disabled:opacity-50"
+          className="btn btn-primary w-full"
         >
           {loading
             ? "Please wait..."
@@ -112,7 +112,7 @@ export default function LoginPage() {
             setMode(mode === "login" ? "signup" : "login");
             setMessage("");
           }}
-          className="w-full text-sm text-slate-300 hover:text-white"
+          className="btn btn-ghost w-full"
         >
           {mode === "login"
             ? "New to Expenza? Create an account"
